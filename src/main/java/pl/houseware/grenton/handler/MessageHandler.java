@@ -18,5 +18,7 @@ public class MessageHandler extends SimpleChannelInboundHandler<GrentonMessage> 
         }
 
         futures.get(msg.getSessionId()).complete(msg.getPayload());
+
+        futures.remove(msg.getSessionId());
     }
 }

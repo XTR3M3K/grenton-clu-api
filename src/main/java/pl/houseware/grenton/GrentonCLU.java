@@ -14,9 +14,7 @@ import pl.houseware.grenton.encryption.GrentonEncryption;
 import pl.houseware.grenton.message.GrentonCommand;
 import pl.houseware.grenton.handler.MessageHandler;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,6 +24,7 @@ public class GrentonCLU {
 
     private final String host;
     private final int port;
+    private final int timeout;
 
     private final String secretKey;
     private final String iv;
@@ -33,13 +32,20 @@ public class GrentonCLU {
     private Channel channel;
 
     private ConcurrentHashMap<String, CompletableFuture<Object>> futures = new ConcurrentHashMap<>();
+    private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
     public GrentonCLU(String host, int port, String secretKey, String iv) {
+        this(host, port, secretKey, iv, 1000);
+    }
+
+    public GrentonCLU(String host, int port, String secretKey, String iv, int timeout) {
         this.host = host;
         this.port = port;
 
         this.secretKey = secretKey;
         this.iv = iv;
+
+        this.timeout = timeout;
     }
 
     public void connect() {
@@ -52,9 +58,9 @@ public class GrentonCLU {
                 .remoteAddress(this.host, this.port)
                 .channel(NioDatagramChannel.class);
 
-        bootstrap.handler(new ChannelInitializer<DatagramChannel>() {
+        bootstrap.handler(new ChannelInitializer<NioDatagramChannel>() {
             @Override
-            protected void initChannel(DatagramChannel ch) {
+            protected void initChannel(NioDatagramChannel ch) {
                 ChannelPipeline pipeline = ch.pipeline();
 
                 var encryption = new GrentonEncryption(secretKey, iv);
@@ -98,6 +104,14 @@ public class GrentonCLU {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
+
+        executor.schedule(() -> {
+            if (futures.containsKey(command.getSessionId())) {
+                futures.get(command.getSessionId()).completeExceptionally(new TimeoutException());
+
+                futures.remove(command.getSessionId());
+            }
+        }, this.timeout, TimeUnit.MILLISECONDS);
 
         return future;
     }
