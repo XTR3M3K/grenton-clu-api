@@ -90,6 +90,22 @@ public class GrentonCLU {
         }
     }
 
+    public void close() {
+
+        try {
+            logger.log(Level.INFO, "Connecting to Grenton CLU at {0}:{1}", new Object[]{this.host, this.port});
+
+            ChannelFuture future = channel.closeFuture().sync();
+
+            if (future.isSuccess()) {
+                logger.log(Level.INFO, "Connected to Grenton CLU at {0}:{1}", new Object[]{this.host, this.port});
+            }
+        } catch (Exception e) {
+            logger.log(Level.INFO, "Failed to connect to Grenton CLU at {0}:{1}", new Object[]{this.host, this.port});
+            logger.log(Level.SEVERE, e.getMessage());
+        }
+    }
+
     public Future<Object> sendCommand(String command) {
         return sendCommand(new GrentonCommand(command));
     }
